@@ -18,6 +18,7 @@ package ante
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	errorsmod "cosmossdk.io/errors"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -56,6 +57,10 @@ func SigVerificationGasConsumer(
 	case *ethsecp256k1.PubKey:
 		// Ethereum keys
 		meter.ConsumeGas(Secp256k1VerifyCost, "ante verify: eth_secp256k1")
+		return nil
+	case *secp256k1.PubKey:
+		// Cosmos SDK keys
+		meter.ConsumeGas(params.SigVerifyCostSecp256k1, "ante verify: ed25519")
 		return nil
 	case *ed25519.PubKey:
 		// Validator keys
