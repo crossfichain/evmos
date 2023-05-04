@@ -336,7 +336,7 @@ func GetConfig(v *viper.Viper) (Config, error) {
 		return Config{}, err
 	}
 
-	return Config{
+	result := Config{
 		Config: cfg,
 		EVM: EVMConfig{
 			Tracer:         v.GetString("evm.tracer"),
@@ -365,7 +365,13 @@ func GetConfig(v *viper.Viper) (Config, error) {
 			CertificatePath: v.GetString("tls.certificate-path"),
 			KeyPath:         v.GetString("tls.key-path"),
 		},
-	}, nil
+	}
+
+	if result.JSONRPC.FeeHistoryCap == 0 {
+		result.JSONRPC.FeeHistoryCap = DefaultFeeHistoryCap
+	}
+
+	return result, nil
 }
 
 // ParseConfig retrieves the default environment configuration for the
