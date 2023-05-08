@@ -59,6 +59,10 @@ func (mpd MinGasPriceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate 
 			Denom:  evmDenom,
 			Amount: minGasPrice,
 		},
+		{
+			Denom:  "xfi",
+			Amount: minGasPrice.MulInt64(2),
+		},
 	}
 
 	feeCoins := feeTx.GetFee()

@@ -25,6 +25,7 @@ import (
 // in the context of the AnteHandler utils package.
 type BankKeeper interface {
 	GetBalance(ctx sdk.Context, addr sdk.AccAddress, denom string) sdk.Coin
+	GetAllBalances(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
 }
 
 // DistributionKeeper defines the exposed interface for using functionality of the distribution

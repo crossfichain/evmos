@@ -17,6 +17,7 @@ package evm
 
 import (
 	"math"
+	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
 	sdkmath "cosmossdk.io/math"
@@ -54,6 +55,14 @@ func NewDynamicFeeChecker(k DynamicFeeEVMKeeper) anteutils.TxFeeChecker {
 			return checkTxFeeWithValidatorMinGasPrices(ctx, feeTx)
 		}
 
+		gas := feeTx.GetGas()
+		feeCoins := feeTx.GetFee()
+
+		if found, _ := feeCoins.Find("xfi"); found {
+			denom = "xfi"
+			baseFee.Mul(baseFee, big.NewInt(2))
+		}
+
 		// default to `MaxInt64` when there's no extension option.
 		maxPriorityPrice := sdkmath.NewInt(math.MaxInt64)
 
@@ -72,8 +81,6 @@ func NewDynamicFeeChecker(k DynamicFeeEVMKeeper) anteutils.TxFeeChecker {
 			return nil, 0, errorsmod.Wrapf(errortypes.ErrInsufficientFee, "max priority price cannot be negative")
 		}
 
-		gas := feeTx.GetGas()
-		feeCoins := feeTx.GetFee()
 		fee := feeCoins.AmountOfNoDenomValidation(denom)
 
 		feeCap := fee.Quo(sdkmath.NewIntFromUint64(gas))
