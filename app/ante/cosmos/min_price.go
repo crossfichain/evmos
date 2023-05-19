@@ -52,11 +52,10 @@ func (mpd MinGasPriceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate 
 	if minGasPrice.IsZero() || simulate {
 		return next(ctx, tx, simulate)
 	}
-	evmParams := mpd.evmKeeper.GetParams(ctx)
-	evmDenom := evmParams.GetEvmDenom()
+
 	minGasPrices := sdk.DecCoins{
 		{
-			Denom:  evmDenom,
+			Denom:  "mpx",
 			Amount: minGasPrice,
 		},
 		{
