@@ -47,5 +47,5 @@ func IsValidChainID(chainID string) bool {
 // ParseChainID parses a string chain identifier's epoch to an Ethereum-compatible
 // chain-id in *big.Int format. The function returns an error if the chain-id has an invalid format
 func ParseChainID(chainID string) (*big.Int, error) {
-	return big.NewInt(1), nil
+	return big.NewInt(4157), nil
 }
