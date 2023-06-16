@@ -188,7 +188,6 @@ func (b *Backend) TraceBlock(height rpctypes.BlockNumber,
 	config *TraceConfig,
 	block *tmrpctypes.ResultBlock,
 ) ([]*evmtypes.TxTraceResult, error) {
-	println(string(config.TracerJsonConfig))
 	txs := block.Block.Txs
 	txsLength := len(txs)
 
