@@ -28,9 +28,56 @@ import (
 	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
+// TraceConfig holds extra parameters to trace functions.
+type TraceConfig struct {
+	// tracer is a custom javascript tracer
+	Tracer string `json:"tracer,omitempty"`
+	// timeout overrides the default timeout of 5 seconds for JavaScript-based tracing
+	// calls
+	Timeout string `json:"timeout,omitempty"`
+	// reexec defines the number of blocks the tracer is willing to go back
+	Reexec uint64 `json:"reexec,omitempty"`
+	// disable_stack switches stack capture
+	DisableStack bool `json:"disableStack"`
+	// disable_storage switches storage capture
+	DisableStorage bool `json:"disableStorage"`
+	// debug can be used to print output during capture end
+	Debug bool `json:"debug,omitempty"`
+	// limit defines the maximum length of output, but zero means unlimited
+	Limit int32 `json:"limit,omitempty"`
+	// overrides can be used to execute a trace using future fork rules
+	Overrides *evmtypes.ChainConfig `json:"overrides,omitempty"`
+	// enable_memory switches memory capture
+	EnableMemory bool `json:"enableMemory"`
+	// enable_return_data switches the capture of return data
+	EnableReturnData bool `json:"enableReturnData"`
+	// tracer_json_config configures the tracer using a JSON string
+	TracerJsonConfig json.RawMessage `json:"tracerConfig"`
+}
+
+func (c *TraceConfig) ToProto() *evmtypes.TraceConfig {
+	if c == nil {
+		return nil
+	}
+
+	return &evmtypes.TraceConfig{
+		Tracer:           c.Tracer,
+		Timeout:          c.Timeout,
+		Reexec:           c.Reexec,
+		DisableStack:     c.DisableStack,
+		DisableStorage:   c.DisableStorage,
+		Debug:            c.Debug,
+		Limit:            c.Limit,
+		Overrides:        c.Overrides,
+		EnableMemory:     c.EnableMemory,
+		EnableReturnData: c.EnableReturnData,
+		TracerJsonConfig: string(c.TracerJsonConfig),
+	}
+}
+
 // TraceTransaction returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
-func (b *Backend) TraceTransaction(hash common.Hash, config *evmtypes.TraceConfig) (interface{}, error) {
+func (b *Backend) TraceTransaction(hash common.Hash, config *TraceConfig) (interface{}, error) {
 	// Get transaction by hash
 	transaction, err := b.GetTxByEthHash(hash)
 	if err != nil {
@@ -109,7 +156,7 @@ func (b *Backend) TraceTransaction(hash common.Hash, config *evmtypes.TraceConfi
 	}
 
 	if config != nil {
-		traceTxRequest.TraceConfig = config
+		traceTxRequest.TraceConfig = config.ToProto()
 	}
 
 	// minus one to get the context of block beginning
@@ -138,9 +185,10 @@ func (b *Backend) TraceTransaction(hash common.Hash, config *evmtypes.TraceConfi
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requested tracer.
 func (b *Backend) TraceBlock(height rpctypes.BlockNumber,
-	config *evmtypes.TraceConfig,
+	config *TraceConfig,
 	block *tmrpctypes.ResultBlock,
 ) ([]*evmtypes.TxTraceResult, error) {
+	println(string(config.TracerJsonConfig))
 	txs := block.Block.Txs
 	txsLength := len(txs)
 
@@ -179,7 +227,7 @@ func (b *Backend) TraceBlock(height rpctypes.BlockNumber,
 
 	traceBlockRequest := &evmtypes.QueryTraceBlockRequest{
 		Txs:             txsMessages,
-		TraceConfig:     config,
+		TraceConfig:     config.ToProto(),
 		BlockNumber:     block.Block.Height,
 		BlockTime:       block.Block.Time,
 		BlockHash:       common.Bytes2Hex(block.BlockID.Hash),
