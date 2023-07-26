@@ -43,6 +43,8 @@ var (
 )
 
 func init() {
+	return
+
 	v1beta1.RegisterProposalType(ProposalTypeRegisterCoin)
 	v1beta1.RegisterProposalType(ProposalTypeRegisterERC20)
 	v1beta1.RegisterProposalType(ProposalTypeToggleTokenConversion)
