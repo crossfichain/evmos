@@ -1,18 +1,5 @@
-// Copyright 2022 Evmos Foundation
-// This file is part of the Evmos Network packages.
-//
-// Evmos is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The Evmos packages are distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the Evmos packages. If not, see https://github.com/evmos/evmos/blob/main/LICENSE
+// Copyright Tharsis Labs Ltd.(Evmos)
+// SPDX-License-Identifier:ENCL-1.0(https://github.com/evmos/evmos/blob/main/LICENSE)
 
 package types
 
@@ -78,6 +65,9 @@ func (msg MsgCreateClawbackVestingAccount) ValidateBasic() error {
 		if period.Length < 1 {
 			return errorsmod.Wrapf(errortypes.ErrInvalidRequest, "invalid period length of %d in period %d, length must be greater than 0", period.Length, i)
 		}
+		if !period.Amount.IsAllPositive() {
+			return errorsmod.Wrapf(errortypes.ErrInvalidRequest, "invalid amount in lockup periods, amounts must be positive")
+		}
 		lockupCoins = lockupCoins.Add(period.Amount...)
 	}
 
@@ -86,9 +76,20 @@ func (msg MsgCreateClawbackVestingAccount) ValidateBasic() error {
 		if period.Length < 1 {
 			return errorsmod.Wrapf(errortypes.ErrInvalidRequest, "invalid period length of %d in period %d, length must be greater than 0", period.Length, i)
 		}
+		if !period.Amount.IsValid() {
+			return errortypes.ErrInvalidCoins.Wrap(period.Amount.String())
+		}
+		if !period.Amount.IsAllPositive() {
+			return errorsmod.Wrapf(errortypes.ErrInvalidRequest, "invalid amount in vesting periods, amounts must be positive")
+		}
+
 		vestingCoins = vestingCoins.Add(period.Amount...)
 	}
 
+	// If neither schedule is present, the message is invalid.
+	if len(lockupCoins) == 0 && len(vestingCoins) == 0 {
+		return errorsmod.Wrapf(errortypes.ErrInvalidRequest, "vesting and/or lockup schedules must be present")
+	}
 	// If both schedules are present, the must describe the same total amount.
 	// IsEqual can panic, so use (a == b) <=> (a <= b && b <= a).
 	if len(msg.LockupPeriods) > 0 && len(msg.VestingPeriods) > 0 &&
