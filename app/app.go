@@ -539,8 +539,6 @@ func NewEvmos(
 			stakingKeeper,
 			app.DistrKeeper,
 			app.AuthzKeeper,
-			app.TransferKeeper,
-			app.IBCKeeper.ChannelKeeper,
 		),
 	)
 
