@@ -47,7 +47,7 @@ func NewDynamicFeeChecker(k DynamicFeeEVMKeeper) anteutils.TxFeeChecker {
 
 		if found, _ := feeCoins.Find("xfi"); found {
 			denom = "xfi"
-			baseFee.Mul(baseFee, big.NewInt(2))
+			baseFee.Div(baseFee, big.NewInt(100))
 		}
 
 		// default to `MaxInt64` when there's no extension option.
