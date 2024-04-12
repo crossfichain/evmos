@@ -60,7 +60,7 @@ func (mpd MinGasPriceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate 
 		},
 		{
 			Denom:  "xfi",
-			Amount: minGasPrice.MulInt64(2),
+			Amount: minGasPrice.QuoInt64(100),
 		},
 	}
 
