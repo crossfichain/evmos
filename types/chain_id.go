@@ -52,5 +52,9 @@ func ParseChainID(chainID string) (*big.Int, error) {
 		return big.NewInt(4156), nil
 	}
 
+	if strings.HasPrefix(chainID, "crossfi-mainnet") {
+		return big.NewInt(4158), nil
+	}
+
 	return big.NewInt(4157), nil
 }
