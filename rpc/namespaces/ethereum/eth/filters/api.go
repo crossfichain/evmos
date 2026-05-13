@@ -108,6 +108,10 @@ func NewPublicAPI(logger log.Logger, clientCtx client.Context, tmWSClient *rpccl
 	return api
 }
 
+// Resubscribe re-issues all active Tendermint event subscriptions. Call this
+// after a TM WS reconnect so existing filters keep receiving events.
+func (api *PublicFilterAPI) Resubscribe() { api.events.Resubscribe() }
+
 // timeoutLoop runs every 5 minutes and deletes filters that have not been recently used.
 // Tt is started when the api is created.
 func (api *PublicFilterAPI) timeoutLoop() {

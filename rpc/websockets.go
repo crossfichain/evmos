@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/gorilla/mux"
@@ -49,8 +50,18 @@ import (
 	evmtypes "github.com/evmos/evmos/v12/x/evm/types"
 )
 
+// wsPingPeriod must be strictly less than wsReadDeadline so a healthy client
+// can refresh its read deadline via the pong handler before it expires.
+const (
+	wsReadDeadline  = 75 * time.Second
+	wsWriteDeadline = 10 * time.Second
+	wsPingPeriod    = 30 * time.Second
+	wsMaxMessage    = 1 << 20 // 1 MiB; matches go-ethereum's default WS frame cap
+)
+
 type WebsocketsServer interface {
 	Start()
+	Resubscribe()
 }
 
 type SubscriptionResponseJSON struct {
@@ -127,6 +138,10 @@ func (s *websocketsServer) Start() {
 	}()
 }
 
+func (s *websocketsServer) Resubscribe() {
+	s.api.events.Resubscribe()
+}
+
 func (s *websocketsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -140,10 +155,43 @@ func (s *websocketsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.readLoop(&wsConn{
+	conn.SetReadLimit(wsMaxMessage)
+	_ = conn.SetReadDeadline(time.Now().Add(wsReadDeadline))
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(wsReadDeadline))
+		return nil
+	})
+
+	wc := &wsConn{
 		mux:  new(sync.Mutex),
 		conn: conn,
-	})
+	}
+
+	pingCtx, pingCancel := context.WithCancel(context.Background())
+	defer pingCancel()
+	go s.pingLoop(pingCtx, wc)
+
+	s.readLoop(wc)
+}
+
+// pingLoop sends a periodic ping control frame so a healthy client can refresh
+// its read deadline via the pong handler. Exits when the context is cancelled
+// (on read-loop exit) or on the first write failure.
+func (s *websocketsServer) pingLoop(ctx context.Context, wc *wsConn) {
+	ticker := time.NewTicker(wsPingPeriod)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// WriteControl is concurrent-safe with WriteMessage/WriteJSON per
+			// gorilla docs, so no need to take wsConn.mux here.
+			if err := wc.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(wsWriteDeadline)); err != nil {
+				return
+			}
+		}
+	}
 }
 
 func (s *websocketsServer) sendErrResponse(wsConn *wsConn, msg string) {
@@ -168,6 +216,7 @@ func (w *wsConn) WriteJSON(v interface{}) error {
 	w.mux.Lock()
 	defer w.mux.Unlock()
 
+	_ = w.conn.SetWriteDeadline(time.Now().Add(wsWriteDeadline))
 	return w.conn.WriteJSON(v)
 }
 

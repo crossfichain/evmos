@@ -289,7 +289,10 @@ func (es *EventSystem) consumeEvents() {
 			var ev coretypes.ResultEvent
 
 			if rpcResp.Error != nil {
-				time.Sleep(5 * time.Second)
+				// Don't sleep: ResponsesCh is unbuffered, so blocking here
+				// head-of-line-stalls every valid event behind this one.
+				es.logger.Error("tendermint RPC error on subscription channel",
+					"code", rpcResp.Error.Code, "message", rpcResp.Error.Message, "data", rpcResp.Error.Data)
 				continue
 			} else if err := tmjson.Unmarshal(rpcResp.Result, &ev); err != nil {
 				es.logger.Error("failed to JSON unmarshal ResponsesCh result event", "error", err.Error())
@@ -320,5 +323,32 @@ func (es *EventSystem) consumeEvents() {
 		}
 
 		time.Sleep(time.Second)
+	}
+}
+
+// Resubscribe re-issues a Tendermint Subscribe for every topic that's currently
+// active in the in-memory event bus. The Tendermint server forgets all
+// per-connection subscriptions across a WS reconnect, so without this the
+// existing topicChans/eventBus pipelines stay alive but no events ever arrive.
+// Intended to be called from the Tendermint WS client's OnReconnect callback.
+func (es *EventSystem) Resubscribe() {
+	es.indexMux.RLock()
+	queries := make([]string, 0, len(es.topicChans))
+	for q := range es.topicChans {
+		queries = append(queries, q)
+	}
+	es.indexMux.RUnlock()
+
+	if len(queries) == 0 {
+		return
+	}
+
+	es.logger.Info("re-issuing tendermint subscriptions after WS reconnect", "count", len(queries))
+	for _, q := range queries {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := es.tmWSClient.Subscribe(ctx, q); err != nil {
+			es.logger.Error("failed to re-subscribe to query after TM reconnect", "query", q, "error", err.Error())
+		}
+		cancel()
 	}
 }

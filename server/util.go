@@ -72,14 +72,21 @@ func AddCommands(
 	)
 }
 
-func ConnectTmWS(tmRPCAddr, tmEndpoint string, logger tmlog.Logger) *rpcclient.WSClient {
+// ConnectTmWS opens a WS client to the local Tendermint RPC. The optional
+// onReconnect callback runs after a successful redial; callers use it to
+// re-issue subscriptions on the fresh connection because Tendermint has no
+// memory of prior subscriptions across a disconnect.
+func ConnectTmWS(tmRPCAddr, tmEndpoint string, logger tmlog.Logger, onReconnect func()) *rpcclient.WSClient {
 	tmWsClient, err := rpcclient.NewWS(tmRPCAddr, tmEndpoint,
 		rpcclient.MaxReconnectAttempts(256),
 		rpcclient.ReadWait(120*time.Second),
 		rpcclient.WriteWait(120*time.Second),
 		rpcclient.PingPeriod(50*time.Second),
 		rpcclient.OnReconnect(func() {
-			logger.Debug("EVM RPC reconnects to Tendermint WS", "address", tmRPCAddr+tmEndpoint)
+			logger.Info("EVM RPC reconnects to Tendermint WS", "address", tmRPCAddr+tmEndpoint)
+			if onReconnect != nil {
+				onReconnect()
+			}
 		}),
 	)
 

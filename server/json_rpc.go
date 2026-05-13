@@ -28,6 +28,7 @@ import (
 	ethlog "github.com/ethereum/go-ethereum/log"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/evmos/evmos/v12/rpc"
+	rpcfilters "github.com/evmos/evmos/v12/rpc/namespaces/ethereum/eth/filters"
 
 	"github.com/evmos/evmos/v12/server/config"
 	evmostypes "github.com/evmos/evmos/v12/types"
@@ -41,7 +42,10 @@ func StartJSONRPC(ctx *server.Context,
 	config *config.Config,
 	indexer evmostypes.EVMTxIndexer,
 ) (*http.Server, chan struct{}, error) {
-	tmWsClient := ConnectTmWS(tmRPCAddr, tmEndpoint, ctx.Logger)
+	// On TM WS reconnect, re-issue every active subscription against the
+	// fresh connection. Assigned below once the filter EventSystem is known.
+	httpResubscribe := func() {}
+	tmWsClient := ConnectTmWS(tmRPCAddr, tmEndpoint, ctx.Logger, func() { httpResubscribe() })
 
 	logger := ctx.Logger.With("module", "geth")
 	ethlog.Root().SetHandler(ethlog.FuncHandler(func(r *ethlog.Record) error {
@@ -71,6 +75,13 @@ func StartJSONRPC(ctx *server.Context,
 				"service", api.Service,
 			)
 			return nil, nil, err
+		}
+	}
+
+	for _, api := range apis {
+		if fa, ok := api.Service.(*rpcfilters.PublicFilterAPI); ok {
+			httpResubscribe = fa.Resubscribe
+			break
 		}
 	}
 
@@ -121,8 +132,10 @@ func StartJSONRPC(ctx *server.Context,
 	ctx.Logger.Info("Starting JSON WebSocket server", "address", config.JSONRPC.WsAddress)
 
 	// allocate separate WS connection to Tendermint
-	tmWsClient = ConnectTmWS(tmRPCAddr, tmEndpoint, ctx.Logger)
+	wsResubscribe := func() {}
+	tmWsClient = ConnectTmWS(tmRPCAddr, tmEndpoint, ctx.Logger, func() { wsResubscribe() })
 	wsSrv := rpc.NewWebsocketsServer(clientCtx, ctx.Logger, tmWsClient, config)
+	wsResubscribe = wsSrv.Resubscribe
 	wsSrv.Start()
 	return httpSrv, httpSrvDone, nil
 }
